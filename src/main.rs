@@ -4,10 +4,8 @@
 #![no_main]
 #![no_std]
 
-use cortex_m::asm;
 use cortex_m_rt::entry;
 use critical_section_lock_mut::LockMut;
-use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use panic_rtt_target as _;
 use rtt_target::{rprintln, rtt_init_print};
 
@@ -15,8 +13,11 @@ use microbit::{
     Board,
     display::blocking::Display,
     hal::{
-        self, gpiote,
+        self,
+        gpio::Level,
+        gpiote::{self, Gpiote},
         pac::{self, interrupt},
+        saadc::{Saadc, SaadcConfig},
         timer::{Instance, Timer},
     },
 };
@@ -25,13 +26,13 @@ mod color;
 use color::*;
 
 static HSV: LockMut<HsvColor> = LockMut::new();
-static GPIOTE_PERIPHERAL: LockMut<gpiote::Gpiote> = LockMut::new();
-static TIMER_DEBOUNCE_A: LockMut<hal::Timer<pac::TIMER1>> = LockMut::new();
-static TIMER_DEBOUNCE_B: LockMut<hal::Timer<pac::TIMER2>> = LockMut::new();
-static TIMER_DEBOUNCE_POT: LockMut<hal::Timer<pac::TIMER3>> = LockMut::new();
+static GPIOTE_PERIPHERAL: LockMut<Gpiote> = LockMut::new();
+static TIMER_DEBOUNCE_A: LockMut<Timer<pac::TIMER1>> = LockMut::new();
+static TIMER_DEBOUNCE_B: LockMut<Timer<pac::TIMER2>> = LockMut::new();
 
 // 100ms at 1MHz count rate.
 const DEBOUNCE_TIME: u32 = 100 * 1_000_000 / 1000;
+const MAX_POT: i16 = 0x3FFF;
 
 #[interrupt]
 fn GPIOTE() {
@@ -54,7 +55,7 @@ fn GPIOTE() {
 fn debounce<T, F>(timer: &LockMut<hal::Timer<T>>, f: F)
 where
     T: Instance,
-    F: FnOnce() -> (),
+    F: FnOnce(),
 {
     timer.with_lock(|timer| {
         if timer.read() == 0 {
@@ -69,24 +70,32 @@ fn main() -> ! {
     rtt_init_print!();
     let board = Board::take().unwrap();
 
+    let mut display = Display::new(board.display_pins);
+
     let mut timer_display = Timer::new(board.TIMER0);
     let mut timer_debounce_a = Timer::new(board.TIMER1);
     let mut timer_debounce_b = Timer::new(board.TIMER2);
-    let mut timer_debounce_pot = Timer::new(board.TIMER3);
-    let mut display = Display::new(board.display_pins);
+
+    let mut saadc = Saadc::new(board.ADC, SaadcConfig::default());
+    let mut pin_pot = board.edge.e02.into_floating_input();
+
+    let mut _pin_r = board.edge.e08.into_push_pull_output(Level::Low).degrade();
+    let mut _pin_g = board.edge.e09.into_push_pull_output(Level::Low).degrade();
+    let mut _pin_b = board.edge.e16.into_push_pull_output(Level::Low).degrade();
+
     let button_a = board.buttons.button_a;
     let button_b = board.buttons.button_b;
 
     let gpiote = gpiote::Gpiote::new(board.GPIOTE);
 
-    let channel0 = gpiote.channel0();
-    channel0
+    let _ = gpiote
+        .channel0()
         .input_pin(&button_a.degrade())
         .hi_to_lo()
         .enable_interrupt();
 
-    let channel1 = gpiote.channel1();
-    channel1
+    let _ = gpiote
+        .channel1()
         .input_pin(&button_b.degrade())
         .hi_to_lo()
         .enable_interrupt();
@@ -101,10 +110,6 @@ fn main() -> ! {
     timer_debounce_b.reset_event();
     TIMER_DEBOUNCE_B.init(timer_debounce_b);
 
-    timer_debounce_pot.disable_interrupt();
-    timer_debounce_pot.reset_event();
-    TIMER_DEBOUNCE_POT.init(timer_debounce_pot);
-
     HSV.init(HsvColor::default());
 
     // Set up the NVIC to handle interrupts.
@@ -114,6 +119,14 @@ fn main() -> ! {
     loop {
         //asm::wfi();
         HSV.with_lock(|hsv| {
+            if let Ok(v) = saadc.read_channel(&mut pin_pot) {
+                let v = v.clamp(0, MAX_POT) as f32 / MAX_POT as f32;
+                hsv.set_current(v);
+                let hsv = hsv.hsv;
+                let rgb = hsv.to_rgb();
+                rprintln!("hsv: {} {} {}", hsv.h, hsv.s, hsv.v);
+                rprintln!("rgb: {} {} {}", rgb.r, rgb.g, rgb.b);
+            }
             display.show(&mut timer_display, hsv.to_display(), 100);
         });
     }

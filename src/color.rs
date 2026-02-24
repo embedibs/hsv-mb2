@@ -3,7 +3,7 @@
 #![allow(unused)]
 
 pub struct HsvColor {
-    hsv: hsv::Hsv,
+    pub hsv: hsv::Hsv,
     pub state: State,
 }
 
@@ -28,17 +28,17 @@ impl HsvColor {
     }
 
     pub fn set_current(&mut self, v: f32) {
-        self.with(|x| *x = v);
+        self.with_current(|x| *x = v);
     }
 
     // If I later decide to do anything else wacky and weird with the color.
-    pub fn with<F: Fn(&mut f32)>(&mut self, f: F) {
+    pub fn with_current<F: Fn(&mut f32)>(&mut self, f: F) {
         use State::*;
 
-        f(&mut match self.state {
-            H => self.hsv.h,
-            S => self.hsv.s,
-            V => self.hsv.v,
+        f(match self.state {
+            H => &mut self.hsv.h,
+            S => &mut self.hsv.s,
+            V => &mut self.hsv.v,
         });
     }
 }
