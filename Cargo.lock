@@ -198,6 +198,7 @@ dependencies = [
  "panic-halt",
  "panic-rtt-target",
  "rtt-target",
+ "state-enum",
 ]
 
 [[package]]
@@ -376,6 +377,15 @@ name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
+
+[[package]]
+name = "state-enum"
+version = "0.1.0"
+source = "git+https://github.com/edibblepdx/state-enum#18c06e205e9c0e88bf0a8a2dab1f9ae237769e87"
+dependencies = [
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "syn"

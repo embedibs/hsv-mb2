@@ -20,6 +20,9 @@ features = ["inline-asm", "critical-section-single-core"]
 [dependencies.hsv]
 git = "https://github.com/pdx-cs-rust-embedded/hsv"
 
+[dependencies.state-enum]
+git = "https://github.com/edibblepdx/state-enum"
+
 [[bin]]
 name = "hsv-mb2"
 path = "src/main.rs"

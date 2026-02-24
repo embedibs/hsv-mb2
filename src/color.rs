@@ -1,6 +1,10 @@
+//! Color
+
+#![allow(unused)]
+
 pub struct HsvColor {
     hsv: hsv::Hsv,
-    state: State,
+    pub state: State,
 }
 
 impl HsvColor {
@@ -39,23 +43,18 @@ impl HsvColor {
     }
 }
 
+impl Default for HsvColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// What color channel is being manipulated.
 /// Can convert to a [`Display`].
 #[rustfmt::skip]
-#[derive(Copy, Clone, Default)]
-pub enum State { #[default] H, S, V }
-
-impl State {
-    const STATES: [Self; 3] = [Self::H, Self::S, Self::V];
-
-    pub fn next(&self) -> Self {
-        Self::STATES[(*self as usize + 1) % 3]
-    }
-
-    pub fn prev(&self) -> Self {
-        Self::STATES[(*self as usize + 2) % 3]
-    }
-}
+#[derive(Debug)]
+#[state_enum::state_enum]
+pub enum State { H, S, V }
 
 impl From<State> for Display {
     fn from(s: State) -> Self {
