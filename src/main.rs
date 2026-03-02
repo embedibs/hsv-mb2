@@ -154,6 +154,9 @@ fn main() -> ! {
 
         RGB_DISPLAY.with_lock(|display| {
             if !display.is_scheduled() {
+                #[cfg(feature = "log")]
+                rprintln!("[INFO] setting next schedule");
+
                 display.set(rgb_color.unwrap());
             }
         });

@@ -9,6 +9,8 @@ use crate::util;
 const FRAME_US: u32 = 10_000;
 const STEP_US: u32 = FRAME_US / 100;
 
+/// The pulse width of a single RGB color channel measured in duty steps:
+/// the discrete form of the duty cycle percentage.
 #[derive(Default)]
 struct RgbPulse {
     // Color channel
@@ -16,10 +18,12 @@ struct RgbPulse {
     // RgbDisplay::step doesn't actually try to use the last index
     // I'll have to walk through it later to see if it's safe or not
     channel: Option<usize>,
-    // Duty steps in [1, 100]
+    // Discrete duty steps in [1, 100]
     duty_steps: u8,
 }
 
+/// Iterator over the pulse widths for the current RGB frame with an empty
+/// buffer at the end where all pulses are ended.
 #[derive(Default)]
 struct RgbPulseFrame {
     items: [RgbPulse; 4],
@@ -54,6 +58,7 @@ impl RgbPulseFrame {
     }
 }
 
+/// RGB Display and scheduler.
 pub struct RgbDisplay {
     // RGB pins.
     rgb_pins: [gpio::Pin<gpio::Output<gpio::PushPull>>; 3],
@@ -86,6 +91,7 @@ impl RgbDisplay {
         self.next_schedule = Some(RgbPulseFrame::new(c));
     }
 
+    /// Returns true if the next schedule is set.
     pub fn is_scheduled(&self) -> bool {
         self.next_schedule.is_some()
     }
