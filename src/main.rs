@@ -1,6 +1,15 @@
 //! hsv-mb2
 //! ethan dibble <edibble@pdx.edu>
 
+// RGB light cycle
+// total 10ms = 10_000us
+// turn all rgb on
+// multiply intensities by 10_000
+// set timer in steps to turn off channels
+// example: (0.8, 0.2, 0.5)
+// interrupt at 2_000, 5_000, 8_000 seconds from cycle start
+// steps of 2_000, 3_000, 3_000
+
 #![no_main]
 #![no_std]
 
@@ -13,25 +22,21 @@ use microbit::{
     Board,
     display::blocking::Display,
     hal::{
-        self,
         gpio::Level,
         gpiote::{self, Gpiote},
         pac::{self, interrupt},
         saadc::{Saadc, SaadcConfig},
-        timer::{Instance, Timer},
+        timer::Timer,
     },
 };
 
-mod color;
-use color::*;
+use hsv_mb2::{color::*, util::*};
 
 static HSV: LockMut<HsvColor> = LockMut::new();
 static GPIOTE_PERIPHERAL: LockMut<Gpiote> = LockMut::new();
-static TIMER_DEBOUNCE_A: LockMut<Timer<pac::TIMER1>> = LockMut::new();
-static TIMER_DEBOUNCE_B: LockMut<Timer<pac::TIMER2>> = LockMut::new();
+static TIMER_DEBOUNCE_A: LockMut<Timer<pac::TIMER0>> = LockMut::new();
+static TIMER_DEBOUNCE_B: LockMut<Timer<pac::TIMER1>> = LockMut::new();
 
-// 100ms at 1MHz count rate.
-const DEBOUNCE_TIME: u32 = 100 * 1_000_000 / 1000;
 const MAX_POT: i16 = 0x3FFF;
 
 #[interrupt]
@@ -52,18 +57,8 @@ fn GPIOTE() {
     });
 }
 
-fn debounce<T, F>(timer: &LockMut<hal::Timer<T>>, f: F)
-where
-    T: Instance,
-    F: FnOnce(),
-{
-    timer.with_lock(|timer| {
-        if timer.read() == 0 {
-            f();
-            timer.start(DEBOUNCE_TIME);
-        }
-    });
-}
+#[interrupt]
+fn TIMER2() {}
 
 #[entry]
 fn main() -> ! {
@@ -72,9 +67,10 @@ fn main() -> ! {
 
     let mut display = Display::new(board.display_pins);
 
-    let mut timer_display = Timer::new(board.TIMER0);
-    let mut timer_debounce_a = Timer::new(board.TIMER1);
-    let mut timer_debounce_b = Timer::new(board.TIMER2);
+    let mut timer_debounce_a = Timer::new(board.TIMER0);
+    let mut timer_debounce_b = Timer::new(board.TIMER1);
+    let mut timer_pwm = Timer::new(board.TIMER2);
+    let mut timer_display = Timer::new(board.TIMER3);
 
     let mut saadc = Saadc::new(board.ADC, SaadcConfig::default());
     let mut pin_pot = board.edge.e02.into_floating_input();
@@ -110,11 +106,9 @@ fn main() -> ! {
     timer_debounce_b.reset_event();
     TIMER_DEBOUNCE_B.init(timer_debounce_b);
 
-    HSV.init(HsvColor::default());
+    init_nvic();
 
-    // Set up the NVIC to handle interrupts.
-    unsafe { pac::NVIC::unmask(pac::Interrupt::GPIOTE) };
-    pac::NVIC::unpend(pac::Interrupt::GPIOTE);
+    HSV.init(HsvColor::default());
 
     loop {
         //asm::wfi();
@@ -130,4 +124,14 @@ fn main() -> ! {
             display.show(&mut timer_display, hsv.to_display(), 100);
         });
     }
+}
+
+/// Set up the NVIC to handle interrupts.
+fn init_nvic() {
+    unsafe {
+        pac::NVIC::unmask(pac::Interrupt::GPIOTE);
+        pac::NVIC::unmask(pac::Interrupt::TIMER2);
+    };
+    pac::NVIC::unpend(pac::Interrupt::GPIOTE);
+    pac::NVIC::unpend(pac::Interrupt::TIMER2);
 }

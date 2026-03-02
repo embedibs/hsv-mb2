@@ -2,15 +2,17 @@
 
 #![allow(unused)]
 
+use hsv::{Hsv, Rgb};
+
 pub struct HsvColor {
-    pub hsv: hsv::Hsv,
+    pub hsv: Hsv,
     pub state: State,
 }
 
 impl HsvColor {
     pub fn new() -> Self {
         Self {
-            hsv: hsv::Hsv {
+            hsv: Hsv {
                 h: 0.0,
                 s: 0.0,
                 v: 0.0,
@@ -19,8 +21,8 @@ impl HsvColor {
         }
     }
 
-    pub fn to_rgb(&self) -> hsv::Rgb {
-        hsv::Rgb::from(self.hsv)
+    pub fn to_rgb(&self) -> Rgb {
+        Rgb::from(self.hsv)
     }
 
     pub fn to_display(&self) -> Display {
