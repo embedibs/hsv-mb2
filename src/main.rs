@@ -99,7 +99,7 @@ fn main() -> ! {
 
     // Potentiometer
     let mut saadc = Saadc::new(board.ADC, SaadcConfig::default());
-    let mut pin_pot = board.edge.e02.into_floating_input();
+    let mut pin_pot = board.edge.e02;
 
     // RGB pins
     let pin_r = board.edge.e08.into_push_pull_output(Level::Low).degrade();
@@ -134,10 +134,11 @@ fn main() -> ! {
     timer_debounce_b.reset_event();
     TIMER_DEBOUNCE_B.init(timer_debounce_b);
 
-    // HSV to RGB display
+    // HSV
     HSV.init(HsvColor::default());
     HSV.with_lock(|hsv| mb2_display.show(&hsv.to_display()));
 
+    // RGB Display
     RGB_DISPLAY.init(RgbDisplay::new([pin_r, pin_g, pin_b], timer_pwm));
     RGB_DISPLAY.with_lock(|display| display.step());
 
@@ -158,8 +159,8 @@ fn main() -> ! {
                 {
                     let hsv = hsv_color.hsv;
                     let rgb = hsv_color.to_rgb();
-                    rprintln!("hsv: {} {} {}", hsv.h, hsv.s, hsv.v);
-                    rprintln!("rgb: {} {} {}", rgb.r, rgb.g, rgb.b);
+                    rprintln!("hsv: {:.2} {:.2} {:.2}", hsv.h, hsv.s, hsv.v);
+                    rprintln!("rgb: {:.2} {:.2} {:.2}", rgb.r, rgb.g, rgb.b);
                 }
 
                 RGB_DISPLAY.with_lock(|display| {

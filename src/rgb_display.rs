@@ -4,6 +4,9 @@ use microbit::hal::{gpio, pac, timer::Timer};
 // The RGB PWM brightness scale is 100 steps, with each step taking 100 µs.
 // 10 ms per frame; 100 frames per second.
 
+#[cfg(feature = "log")]
+use rtt_target::rprintln;
+
 const STEP_US: u32 = 100;
 
 /// RGB Display and scheduler.
@@ -30,7 +33,7 @@ impl RgbDisplay {
         Self {
             rgb_pins,
             tick: 0,
-            schedule: [100, 100, 100],
+            schedule: [0, 0, 0],
             next_schedule: None,
             timer3,
         }
@@ -53,7 +56,7 @@ impl RgbDisplay {
     /// Reset self
     pub fn reset(&mut self) {
         for pin in &mut self.rgb_pins {
-            pin.set_high().unwrap();
+            pin.set_low().unwrap();
         }
 
         self.tick = 0;
@@ -64,26 +67,28 @@ impl RgbDisplay {
     pub fn step(&mut self) {
         self.timer3.reset_event();
 
-        if let Some(&next_tick) = self //
+        if let Some(&next_tick) = self
             .schedule
             .iter()
-            .filter(|duty| **duty > self.tick)
+            .chain(&[100])
+            .filter(|&duty| *duty > self.tick)
             .min()
         {
-            for (i, &tick) in self.schedule.iter().enumerate() {
-                if tick == next_tick {
-                    self.rgb_pins[i].set_low();
+            // multiple channels could have the same duty cycle.
+            for (i, pin) in self.rgb_pins.iter_mut().enumerate() {
+                if self.schedule[i] == self.tick {
+                    pin.set_high().unwrap();
                 }
             }
 
             let delay = (next_tick - self.tick) * STEP_US;
 
             self.tick = next_tick;
-            self.timer3.delay(delay.max(STEP_US));
+            self.timer3.delay(delay);
         } else if let Some(schedule) = self.next_schedule.take() {
             self.schedule = schedule;
             self.reset();
-            self.timer3.start(STEP_US);
+            self.step();
         } else {
             // no schedule, delay a little
             self.timer3.start(STEP_US);
