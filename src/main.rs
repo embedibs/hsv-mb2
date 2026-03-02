@@ -22,7 +22,7 @@ use rtt_target::{rprintln, rtt_init_print};
 
 use microbit::{
     Board,
-    display::blocking::Display,
+    display::nonblocking::Display,
     hal::{
         gpio::Level,
         gpiote::{self, Gpiote},
@@ -36,6 +36,7 @@ use hsv_mb2::{color::*, rgb_display::*, util::*};
 
 static HSV: LockMut<HsvColor> = LockMut::new();
 static RGB_DISPLAY: LockMut<RgbDisplay> = LockMut::new();
+static MB2_DISPLAY: LockMut<Display<pac::TIMER2>> = LockMut::new();
 
 static GPIOTE_PERIPHERAL: LockMut<Gpiote> = LockMut::new();
 static TIMER_DEBOUNCE_A: LockMut<Timer<pac::TIMER0>> = LockMut::new();
@@ -43,22 +44,38 @@ static TIMER_DEBOUNCE_B: LockMut<Timer<pac::TIMER1>> = LockMut::new();
 
 const MAX_POT: i16 = 0x3FFF;
 
+// WARN: this is big, but the blocking display was an issue
 #[interrupt]
 fn GPIOTE() {
     GPIOTE_PERIPHERAL.with_lock(|gpiote| {
         if gpiote.channel0().is_event_triggered() {
             debounce(&TIMER_DEBOUNCE_A, || {
-                HSV.with_lock(|hsv| hsv.state = hsv.state.prev())
+                HSV.with_lock(|hsv| {
+                    hsv.state = hsv.state.prev();
+                    MB2_DISPLAY.with_lock(|display| {
+                        display.show(&hsv.to_display());
+                    });
+                });
             });
         }
         if gpiote.channel1().is_event_triggered() {
             debounce(&TIMER_DEBOUNCE_B, || {
-                HSV.with_lock(|hsv| hsv.state = hsv.state.next())
+                HSV.with_lock(|hsv| {
+                    hsv.state = hsv.state.next();
+                    MB2_DISPLAY.with_lock(|display| {
+                        display.show(&hsv.to_display());
+                    });
+                });
             });
         }
         gpiote.channel0().reset_events();
         gpiote.channel1().reset_events();
     });
+}
+
+#[interrupt]
+fn TIMER2() {
+    MB2_DISPLAY.with_lock(|display| display.handle_display_event());
 }
 
 #[interrupt]
@@ -72,13 +89,13 @@ fn main() -> ! {
     rtt_init_print!();
 
     let board = Board::take().unwrap();
-    let mut mb2_display = Display::new(board.display_pins);
 
-    // Timers
+    let mut mb2_display = Display::new(board.TIMER2, board.display_pins);
+    let timer_pwm = Timer::new(board.TIMER3);
+
+    // Button debounce timers
     let mut timer_debounce_a = Timer::new(board.TIMER0);
     let mut timer_debounce_b = Timer::new(board.TIMER1);
-    let mut timer_display = Timer::new(board.TIMER2);
-    let timer_pwm = Timer::new(board.TIMER3);
 
     // Potentiometer
     let mut saadc = Saadc::new(board.ADC, SaadcConfig::default());
@@ -119,21 +136,18 @@ fn main() -> ! {
 
     // HSV to RGB display
     HSV.init(HsvColor::default());
+    HSV.with_lock(|hsv| mb2_display.show(&hsv.to_display()));
 
     RGB_DISPLAY.init(RgbDisplay::new([pin_r, pin_g, pin_b], timer_pwm));
     RGB_DISPLAY.with_lock(|display| display.step());
 
+    // MB2 Display
+    MB2_DISPLAY.init(mb2_display);
+
     // Initialize interrupts
     init_nvic();
 
-    // TODO: talk to Bart about this section.
-    // I'm trying to keep the critical sections small and not use the blocking
-    // display inside the lock. But ask if using options like this is okay.
     loop {
-        // Safety: these will always be initialized.
-        let mut rgb_color = None;
-        let mut hsv_display = None;
-
         HSV.with_lock(|hsv_color| {
             if let Ok(v) = saadc.read_channel(&mut pin_pot) {
                 let v = v.clamp(0, MAX_POT) as f32 / MAX_POT as f32;
@@ -148,20 +162,15 @@ fn main() -> ! {
                 }
             }
 
-            rgb_color = Some(hsv_color.to_rgb());
-            hsv_display = Some(hsv_color.to_display());
+            RGB_DISPLAY.with_lock(|display| {
+                if !display.is_scheduled() {
+                    #[cfg(feature = "log")]
+                    rprintln!("[INFO] setting next schedule");
+
+                    display.set_schedule(hsv_color.to_rgb());
+                }
+            });
         });
-
-        RGB_DISPLAY.with_lock(|display| {
-            if !display.is_scheduled() {
-                #[cfg(feature = "log")]
-                rprintln!("[INFO] setting next schedule");
-
-                display.set(rgb_color.unwrap());
-            }
-        });
-
-        mb2_display.show(&mut timer_display, hsv_display.unwrap(), 100);
     }
 }
 
@@ -169,8 +178,10 @@ fn main() -> ! {
 fn init_nvic() {
     unsafe {
         pac::NVIC::unmask(pac::Interrupt::GPIOTE);
+        pac::NVIC::unmask(pac::Interrupt::TIMER2);
         pac::NVIC::unmask(pac::Interrupt::TIMER3);
     };
     pac::NVIC::unpend(pac::Interrupt::GPIOTE);
+    pac::NVIC::unpend(pac::Interrupt::TIMER2);
     pac::NVIC::unpend(pac::Interrupt::TIMER3);
 }

@@ -1,73 +1,21 @@
 use embedded_hal::digital::OutputPin;
 use microbit::hal::{gpio, pac, timer::Timer};
 
-use crate::util;
-
 // The RGB PWM brightness scale is 100 steps, with each step taking 100 µs.
 // 10 ms per frame; 100 frames per second.
 
-const FRAME_US: u32 = 10_000;
-const STEP_US: u32 = FRAME_US / 100;
-
-/// The pulse width of a single RGB color channel measured in duty steps:
-/// the discrete form of the duty cycle percentage.
-#[derive(Default)]
-struct RgbPulse {
-    // Color channel
-    // INFO: this option might not be necessary
-    // RgbDisplay::step doesn't actually try to use the last index
-    // I'll have to walk through it later to see if it's safe or not
-    channel: Option<usize>,
-    // Discrete duty steps in [1, 100]
-    duty_steps: u8,
-}
-
-/// Iterator over the pulse widths for the current RGB frame with an empty
-/// buffer at the end where all pulses are ended.
-#[derive(Default)]
-struct RgbPulseFrame {
-    items: [RgbPulse; 4],
-    index: usize,
-}
-
-impl RgbPulseFrame {
-    fn new(c: hsv::Rgb) -> Self {
-        #[rustfmt::skip]
-        let mut items = [
-            RgbPulse { channel: Some(0), duty_steps: (c.r * 100.0) as u8 },
-            RgbPulse { channel: Some(1), duty_steps: (c.g * 100.0) as u8 },
-            RgbPulse { channel: Some(2), duty_steps: (c.b * 100.0) as u8 },
-            RgbPulse { channel: None, duty_steps: 100 },
-        ];
-
-        util::sort3_by_key(&mut items[..3], |c| c.duty_steps);
-
-        Self { items, index: 0 }
-    }
-
-    /// Next [`RgbPulse`].
-    fn next_mut(&mut self) -> Option<&mut RgbPulse> {
-        match self.index {
-            0..4 => {
-                let item = Some(&mut self.items[self.index]);
-                self.index += 1;
-                item
-            }
-            _ => None,
-        }
-    }
-}
+const STEP_US: u32 = 100;
 
 /// RGB Display and scheduler.
 pub struct RgbDisplay {
     // RGB pins.
     rgb_pins: [gpio::Pin<gpio::Output<gpio::PushPull>>; 3],
     // Current RGB channel.
-    current_pin: Option<usize>,
-    // What ticks should RGB LEDs turn off at?
-    schedule: RgbPulseFrame,
+    tick: u32,
+    // What duty steps should RGB LEDs turn off at?
+    schedule: [u32; 3],
     // Schedule to start at next frame.
-    next_schedule: Option<RgbPulseFrame>,
+    next_schedule: Option<[u32; 3]>,
     // Timer used to reach next tick.
     timer3: Timer<pac::TIMER3>,
 }
@@ -75,20 +23,26 @@ pub struct RgbDisplay {
 impl RgbDisplay {
     pub fn new(
         rgb_pins: [gpio::Pin<gpio::Output<gpio::PushPull>>; 3],
-        timer3: Timer<pac::TIMER3>,
+        mut timer3: Timer<pac::TIMER3>,
     ) -> Self {
+        timer3.enable_interrupt();
+
         Self {
             rgb_pins,
-            current_pin: None,
-            schedule: RgbPulseFrame::default(),
+            tick: 0,
+            schedule: [100, 100, 100],
             next_schedule: None,
             timer3,
         }
     }
 
     /// Set up a new schedule, to be started next frame.
-    pub fn set(&mut self, c: hsv::Rgb) {
-        self.next_schedule = Some(RgbPulseFrame::new(c));
+    pub fn set_schedule(&mut self, c: hsv::Rgb) {
+        self.next_schedule = Some([
+            (c.r * 100.0) as u32,
+            (c.g * 100.0) as u32,
+            (c.b * 100.0) as u32,
+        ]);
     }
 
     /// Returns true if the next schedule is set.
@@ -96,29 +50,43 @@ impl RgbDisplay {
         self.next_schedule.is_some()
     }
 
+    /// Reset self
+    pub fn reset(&mut self) {
+        for pin in &mut self.rgb_pins {
+            pin.set_high().unwrap();
+        }
+
+        self.tick = 0;
+    }
+
     /// Take the next frame update step. Called at startup
     /// and then from the timer interrupt handler.
     pub fn step(&mut self) {
-        if let Some(RgbPulse {
-            channel,
-            duty_steps,
-        }) = self.schedule.next_mut()
+        self.timer3.reset_event();
+
+        if let Some(&next_tick) = self //
+            .schedule
+            .iter()
+            .filter(|duty| **duty > self.tick)
+            .min()
         {
-            if let Some(pin_index) = self.current_pin {
-                self.rgb_pins[pin_index].set_low();
+            for (i, &tick) in self.schedule.iter().enumerate() {
+                if tick == next_tick {
+                    self.rgb_pins[i].set_low();
+                }
             }
-            // TODO: double check if the timer expects micro seconds
-            self.timer3.start((*duty_steps as u32) * STEP_US);
-            self.current_pin = channel.take();
+
+            let delay = (next_tick - self.tick) * STEP_US;
+
+            self.tick = next_tick;
+            self.timer3.delay(delay.max(STEP_US));
         } else if let Some(schedule) = self.next_schedule.take() {
-            for pin in &mut self.rgb_pins {
-                pin.set_high();
-            }
             self.schedule = schedule;
-            self.step();
+            self.reset();
+            self.timer3.start(STEP_US);
         } else {
             // no schedule, delay a little
-            self.timer3.start(10);
+            self.timer3.start(STEP_US);
         }
     }
 }

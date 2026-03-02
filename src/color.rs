@@ -3,6 +3,7 @@
 #![allow(unused)]
 
 use hsv::{Hsv, Rgb};
+use microbit::display::nonblocking::BitImage;
 
 pub struct HsvColor {
     pub hsv: Hsv,
@@ -13,9 +14,9 @@ impl HsvColor {
     pub fn new() -> Self {
         Self {
             hsv: Hsv {
-                h: 0.0,
-                s: 0.0,
-                v: 0.0,
+                h: 0.1,
+                s: 0.1,
+                v: 0.1,
             },
             state: State::default(),
         }
@@ -25,8 +26,8 @@ impl HsvColor {
         Rgb::from(self.hsv)
     }
 
-    pub fn to_display(&self) -> Display {
-        Display::from(self.state)
+    pub fn to_display(&self) -> BitImage {
+        BitImage::from(self.state)
     }
 
     pub fn set_current(&mut self, v: f32) {
@@ -58,7 +59,7 @@ impl Default for HsvColor {
 #[state_enum::state_enum]
 pub enum State { H, S, V }
 
-impl From<State> for Display {
+impl From<State> for BitImage {
     fn from(s: State) -> Self {
         use State::*;
 
@@ -70,32 +71,29 @@ impl From<State> for Display {
     }
 }
 
-/// 5x5 display buffer for the BBC Micro:Bit V2.
-pub type Display = [[u8; 5]; 5];
-
 #[rustfmt::skip]
-pub const DISPLAY_H: Display = [
+pub const DISPLAY_H: BitImage = BitImage::new(&[
     [0,1,0,1,0],
     [0,1,0,1,0],
     [0,1,1,1,0],
     [0,1,0,1,0],
     [0,1,0,1,0],
-];
+]);
 
 #[rustfmt::skip]
-pub const DISPLAY_S: Display = [
+pub const DISPLAY_S: BitImage = BitImage::new(&[
     [0,1,1,1,0],
     [0,1,0,0,0],
     [0,1,1,1,0],
     [0,0,0,1,0],
     [0,1,1,1,0],
-];
+]);
 
 #[rustfmt::skip]
-pub const DISPLAY_V: Display = [
+pub const DISPLAY_V: BitImage = BitImage::new(&[
     [0,1,0,1,0],
     [0,1,0,1,0],
     [0,1,0,1,0],
     [0,1,0,1,0],
     [0,0,1,0,0],
-];
+]);
