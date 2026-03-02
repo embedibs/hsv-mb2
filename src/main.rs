@@ -148,9 +148,10 @@ fn main() -> ! {
     init_nvic();
 
     loop {
-        HSV.with_lock(|hsv_color| {
-            if let Ok(v) = saadc.read_channel(&mut pin_pot) {
-                let v = v.clamp(0, MAX_POT) as f32 / MAX_POT as f32;
+        if let Ok(v) = saadc.read_channel(&mut pin_pot) {
+            let v = v.clamp(0, MAX_POT) as f32 / MAX_POT as f32;
+
+            HSV.with_lock(|hsv_color| {
                 hsv_color.set_current(v);
 
                 #[cfg(feature = "log")]
@@ -160,17 +161,17 @@ fn main() -> ! {
                     rprintln!("hsv: {} {} {}", hsv.h, hsv.s, hsv.v);
                     rprintln!("rgb: {} {} {}", rgb.r, rgb.g, rgb.b);
                 }
-            }
 
-            RGB_DISPLAY.with_lock(|display| {
-                if !display.is_scheduled() {
-                    #[cfg(feature = "log")]
-                    rprintln!("[INFO] setting next schedule");
+                RGB_DISPLAY.with_lock(|display| {
+                    if !display.is_scheduled() {
+                        #[cfg(feature = "log")]
+                        rprintln!("[INFO] setting next schedule");
 
-                    display.set_schedule(hsv_color.to_rgb());
-                }
+                        display.set_schedule(hsv_color.to_rgb());
+                    }
+                });
             });
-        });
+        }
     }
 }
 
