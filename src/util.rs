@@ -7,6 +7,7 @@ use microbit::hal::timer::{Instance, Timer};
 /// 100ms at 1MHz count rate.
 pub const DEBOUNCE_TIME: u32 = 100 * 1_000_000 / 1000;
 
+// WARN: This seems unnecessary. Like I was trying to abstract too much.
 /// Debounce Helper
 pub fn debounce<T, F>(timer: &LockMut<Timer<T>>, f: F)
 where

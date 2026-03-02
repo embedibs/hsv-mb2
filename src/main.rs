@@ -16,6 +16,8 @@
 use cortex_m_rt::entry;
 use critical_section_lock_mut::LockMut;
 use panic_rtt_target as _;
+
+#[cfg(feature = "log")]
 use rtt_target::{rprintln, rtt_init_print};
 
 use microbit::{
@@ -30,9 +32,11 @@ use microbit::{
     },
 };
 
-use hsv_mb2::{color::*, util::*};
+use hsv_mb2::{color::*, rgb_display::*, util::*};
 
 static HSV: LockMut<HsvColor> = LockMut::new();
+static RGB_DISPLAY: LockMut<RgbDisplay> = LockMut::new();
+
 static GPIOTE_PERIPHERAL: LockMut<Gpiote> = LockMut::new();
 static TIMER_DEBOUNCE_A: LockMut<Timer<pac::TIMER0>> = LockMut::new();
 static TIMER_DEBOUNCE_B: LockMut<Timer<pac::TIMER1>> = LockMut::new();
@@ -58,27 +62,34 @@ fn GPIOTE() {
 }
 
 #[interrupt]
-fn TIMER2() {}
+fn TIMER3() {
+    RGB_DISPLAY.with_lock(|display| display.step());
+}
 
 #[entry]
 fn main() -> ! {
+    #[cfg(feature = "log")]
     rtt_init_print!();
+
     let board = Board::take().unwrap();
+    let mut mb2_display = Display::new(board.display_pins);
 
-    let mut display = Display::new(board.display_pins);
-
+    // Timers
     let mut timer_debounce_a = Timer::new(board.TIMER0);
     let mut timer_debounce_b = Timer::new(board.TIMER1);
-    let mut timer_pwm = Timer::new(board.TIMER2);
-    let mut timer_display = Timer::new(board.TIMER3);
+    let mut timer_display = Timer::new(board.TIMER2);
+    let timer_pwm = Timer::new(board.TIMER3);
 
+    // Potentiometer
     let mut saadc = Saadc::new(board.ADC, SaadcConfig::default());
     let mut pin_pot = board.edge.e02.into_floating_input();
 
-    let mut _pin_r = board.edge.e08.into_push_pull_output(Level::Low).degrade();
-    let mut _pin_g = board.edge.e09.into_push_pull_output(Level::Low).degrade();
-    let mut _pin_b = board.edge.e16.into_push_pull_output(Level::Low).degrade();
+    // RGB pins
+    let pin_r = board.edge.e08.into_push_pull_output(Level::Low).degrade();
+    let pin_g = board.edge.e09.into_push_pull_output(Level::Low).degrade();
+    let pin_b = board.edge.e16.into_push_pull_output(Level::Low).degrade();
 
+    // Button interrupts and events
     let button_a = board.buttons.button_a;
     let button_b = board.buttons.button_b;
 
@@ -106,23 +117,48 @@ fn main() -> ! {
     timer_debounce_b.reset_event();
     TIMER_DEBOUNCE_B.init(timer_debounce_b);
 
-    init_nvic();
-
+    // HSV to RGB display
     HSV.init(HsvColor::default());
 
+    RGB_DISPLAY.init(RgbDisplay::new([pin_r, pin_g, pin_b], timer_pwm));
+    RGB_DISPLAY.with_lock(|display| display.step());
+
+    // Initialize interrupts
+    init_nvic();
+
+    // TODO: talk to Bart about this section.
+    // I'm trying to keep the critical sections small and not use the blocking
+    // display inside the lock. But ask if using options like this is okay.
     loop {
-        //asm::wfi();
-        HSV.with_lock(|hsv| {
+        // Safety: these will always be initialized.
+        let mut rgb_color = None;
+        let mut hsv_display = None;
+
+        HSV.with_lock(|hsv_color| {
             if let Ok(v) = saadc.read_channel(&mut pin_pot) {
                 let v = v.clamp(0, MAX_POT) as f32 / MAX_POT as f32;
-                hsv.set_current(v);
-                let hsv = hsv.hsv;
-                let rgb = hsv.to_rgb();
-                rprintln!("hsv: {} {} {}", hsv.h, hsv.s, hsv.v);
-                rprintln!("rgb: {} {} {}", rgb.r, rgb.g, rgb.b);
+                hsv_color.set_current(v);
+
+                #[cfg(feature = "log")]
+                {
+                    let hsv = hsv_color.hsv;
+                    let rgb = hsv_color.to_rgb();
+                    rprintln!("hsv: {} {} {}", hsv.h, hsv.s, hsv.v);
+                    rprintln!("rgb: {} {} {}", rgb.r, rgb.g, rgb.b);
+                }
             }
-            display.show(&mut timer_display, hsv.to_display(), 100);
+
+            rgb_color = Some(hsv_color.to_rgb());
+            hsv_display = Some(hsv_color.to_display());
         });
+
+        RGB_DISPLAY.with_lock(|display| {
+            if !display.is_scheduled() {
+                display.set(rgb_color.unwrap());
+            }
+        });
+
+        mb2_display.show(&mut timer_display, hsv_display.unwrap(), 100);
     }
 }
 
@@ -130,8 +166,8 @@ fn main() -> ! {
 fn init_nvic() {
     unsafe {
         pac::NVIC::unmask(pac::Interrupt::GPIOTE);
-        pac::NVIC::unmask(pac::Interrupt::TIMER2);
+        pac::NVIC::unmask(pac::Interrupt::TIMER3);
     };
     pac::NVIC::unpend(pac::Interrupt::GPIOTE);
-    pac::NVIC::unpend(pac::Interrupt::TIMER2);
+    pac::NVIC::unpend(pac::Interrupt::TIMER3);
 }

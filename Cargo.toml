@@ -23,9 +23,5 @@ git = "https://github.com/pdx-cs-rust-embedded/hsv"
 [dependencies.state-enum]
 git = "https://github.com/edibblepdx/state-enum"
 
-[[bin]]
-name = "hsv-mb2"
-path = "src/main.rs"
-test = false
-doctest = false
-bench = false
+[features]
+log = []

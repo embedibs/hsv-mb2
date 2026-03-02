@@ -54,7 +54,7 @@ impl RgbPulseFrame {
     }
 }
 
-struct RgbDisplay {
+pub struct RgbDisplay {
     // RGB pins.
     rgb_pins: [gpio::Pin<gpio::Output<gpio::PushPull>>; 3],
     // Current RGB channel.
@@ -64,31 +64,35 @@ struct RgbDisplay {
     // Schedule to start at next frame.
     next_schedule: Option<RgbPulseFrame>,
     // Timer used to reach next tick.
-    timer0: Timer<pac::TIMER0>,
+    timer3: Timer<pac::TIMER3>,
 }
 
 impl RgbDisplay {
-    fn new(
+    pub fn new(
         rgb_pins: [gpio::Pin<gpio::Output<gpio::PushPull>>; 3],
-        timer0: Timer<pac::TIMER0>,
+        timer3: Timer<pac::TIMER3>,
     ) -> Self {
         Self {
             rgb_pins,
             current_pin: None,
             schedule: RgbPulseFrame::default(),
             next_schedule: None,
-            timer0,
+            timer3,
         }
     }
 
     /// Set up a new schedule, to be started next frame.
-    fn set(&mut self, c: hsv::Hsv) {
-        self.next_schedule = Some(RgbPulseFrame::new(hsv::Rgb::from(c)));
+    pub fn set(&mut self, c: hsv::Rgb) {
+        self.next_schedule = Some(RgbPulseFrame::new(c));
+    }
+
+    pub fn is_scheduled(&self) -> bool {
+        self.next_schedule.is_some()
     }
 
     /// Take the next frame update step. Called at startup
     /// and then from the timer interrupt handler.
-    fn step(&mut self) {
+    pub fn step(&mut self) {
         if let Some(RgbPulse {
             channel,
             duty_steps,
@@ -98,7 +102,7 @@ impl RgbDisplay {
                 self.rgb_pins[pin_index].set_low();
             }
             // TODO: double check if the timer expects micro seconds
-            self.timer0.start((*duty_steps as u32) * STEP_US);
+            self.timer3.start((*duty_steps as u32) * STEP_US);
             self.current_pin = channel.take();
         } else if let Some(schedule) = self.next_schedule.take() {
             for pin in &mut self.rgb_pins {
@@ -108,7 +112,7 @@ impl RgbDisplay {
             self.step();
         } else {
             // no schedule, delay a little
-            self.timer0.start(10);
+            self.timer3.start(10);
         }
     }
 }
