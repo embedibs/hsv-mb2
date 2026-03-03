@@ -1,7 +1,5 @@
 //! Color
 
-#![allow(unused)]
-
 use hsv::{Hsv, Rgb};
 use microbit::display::nonblocking::BitImage;
 
@@ -53,7 +51,7 @@ impl Default for HsvColor {
 }
 
 /// What color channel is being manipulated.
-/// Can convert to a [`Display`].
+/// Can convert to a [`BitImage`].
 #[rustfmt::skip]
 #[derive(Debug)]
 #[state_enum::state_enum]

@@ -1,4 +1,4 @@
-use embedded_hal::digital::OutputPin;
+use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use microbit::hal::{gpio, pac, timer::Timer};
 
 // The RGB PWM brightness scale is 100 steps, with each step taking 100 µs.
@@ -21,12 +21,15 @@ pub struct RgbDisplay {
     next_schedule: Option<[u32; 3]>,
     // Timer used to reach next tick.
     timer3: Timer<pac::TIMER3>,
+    // Brightness [0,1] scales the duty cycle
+    brightness: f32,
 }
 
 impl RgbDisplay {
     pub fn new(
         rgb_pins: [gpio::Pin<gpio::Output<gpio::PushPull>>; 3],
         mut timer3: Timer<pac::TIMER3>,
+        brightness: f32,
     ) -> Self {
         timer3.enable_interrupt();
 
@@ -36,15 +39,16 @@ impl RgbDisplay {
             schedule: [0, 0, 0],
             next_schedule: None,
             timer3,
+            brightness: brightness.clamp(0.0, 1.0),
         }
     }
 
     /// Set up a new schedule, to be started next frame.
     pub fn set_schedule(&mut self, c: hsv::Rgb) {
         self.next_schedule = Some([
-            (c.r * 100.0) as u32,
-            (c.g * 100.0) as u32,
-            (c.b * 100.0) as u32,
+            (c.r * 100.0 * self.brightness) as u32,
+            (c.g * 100.0 * self.brightness) as u32,
+            (c.b * 100.0 * self.brightness) as u32,
         ]);
     }
 
@@ -53,19 +57,24 @@ impl RgbDisplay {
         self.next_schedule.is_some()
     }
 
-    /// Reset self
+    /// Reset schedule
     pub fn reset(&mut self) {
-        for pin in &mut self.rgb_pins {
-            pin.set_low().unwrap();
+        for (i, pin) in self.rgb_pins.iter_mut().enumerate() {
+            if self.schedule[i] != 0 {
+                pin.set_low().unwrap();
+            }
         }
 
         self.tick = 0;
+        // Let the interrupt handler call step
+        self.timer3.start(5);
     }
 
     /// Take the next frame update step. Called at startup
     /// and then from the timer interrupt handler.
     pub fn step(&mut self) {
-        self.timer3.reset_event();
+        // The timer event is already reset internally
+        // self.timer3.reset_event();
 
         if let Some(&next_tick) = self
             .schedule
@@ -83,15 +92,22 @@ impl RgbDisplay {
 
             let delay = (next_tick - self.tick) * STEP_US;
 
+            // delay_us delay
+            // = { apply delay_us }
+            // delay_ns (delay * 1_000)
+            // = { apply delay_ns }
+            // delay (delay * 1_000 / 1_000)
+            // = { apply delay }
+            // start delay;
+            // spin loop until done
+
             self.tick = next_tick;
-            self.timer3.delay(delay);
-        } else if let Some(schedule) = self.next_schedule.take() {
-            self.schedule = schedule;
-            self.reset();
-            self.step();
+            self.timer3.start(delay.max(5) /* microseconds */);
         } else {
-            // no schedule, delay a little
-            self.timer3.start(STEP_US);
+            if let Some(schedule) = self.next_schedule.take() {
+                self.schedule = schedule;
+            }
+            self.reset();
         }
     }
 }

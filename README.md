@@ -12,8 +12,12 @@ cargo install --locked probe-rs-tools
 ## Build and Run
 
 ```
-cargo embed
+cargo embed --release
 ```
+
+## Features
+
+- log: enables rtt logging
 
 ## License
 

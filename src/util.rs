@@ -5,12 +5,12 @@ use critical_section_lock_mut::LockMut;
 use microbit::hal::timer::{Instance, Timer};
 
 /// 100ms at 1MHz count rate.
-pub const DEBOUNCE_TIME: u32 = 100 * 1_000_000 / 1000;
+const DEBOUNCE_TIME: u32 = 100 * 1_000_000 / 1000;
 
 /// Debounce Helper
-pub fn debounce<T, F>(timer: &LockMut<Timer<T>>, f: F)
+pub fn debounce<I, F>(timer: &LockMut<Timer<I>>, f: F)
 where
-    T: Instance,
+    I: Instance,
     F: FnOnce(),
 {
     timer.with_lock(|timer| {
@@ -19,6 +19,29 @@ where
             timer.start(DEBOUNCE_TIME);
         }
     });
+}
+
+/// Debounced button events
+pub struct Button<I, F> {
+    timer: Timer<I>,
+    on_press: F,
+}
+
+impl<I, F> Button<I, F>
+where
+    I: Instance,
+    F: Fn(),
+{
+    pub fn new(timer: Timer<I>, on_press: F) -> Self {
+        Self { timer, on_press }
+    }
+
+    pub fn handle_event(&mut self) {
+        if self.timer.read() == 0 {
+            (self.on_press)();
+            self.timer.start(DEBOUNCE_TIME);
+        }
+    }
 }
 
 /// Sorts exactly three elements by key.
@@ -36,7 +59,6 @@ pub fn sort3<T, G>(list: &mut [T], mut g: G)
 where
     G: FnMut(&T, &T) -> bool,
 {
-    // WARN: Ask Bart about asserting this
     assert_eq!(list.len(), 3);
     if g(&list[1], &list[0]) {
         list.swap(1, 0);
