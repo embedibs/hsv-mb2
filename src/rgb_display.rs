@@ -58,7 +58,7 @@ impl RgbDisplay {
     }
 
     /// Reset schedule
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         for (i, pin) in self.rgb_pins.iter_mut().enumerate() {
             if self.schedule[i] != 0 {
                 pin.set_low().unwrap();
@@ -67,7 +67,7 @@ impl RgbDisplay {
 
         self.tick = 0;
         // Let the interrupt handler call step
-        self.timer3.start(5);
+        self.timer3.start(STEP_US);
     }
 
     /// Take the next frame update step. Called at startup
@@ -80,7 +80,7 @@ impl RgbDisplay {
             .schedule
             .iter()
             .chain(&[100])
-            .filter(|&duty| *duty > self.tick)
+            .filter(|&&duty| duty > self.tick)
             .min()
         {
             // multiple channels could have the same duty cycle.
@@ -102,7 +102,7 @@ impl RgbDisplay {
             // spin loop until done
 
             self.tick = next_tick;
-            self.timer3.start(delay.max(5) /* microseconds */);
+            self.timer3.start(delay.max(STEP_US) /* microseconds */);
         } else {
             if let Some(schedule) = self.next_schedule.take() {
                 self.schedule = schedule;

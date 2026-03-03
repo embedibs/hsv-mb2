@@ -59,7 +59,7 @@ pub fn sort3<T, G>(list: &mut [T], mut g: G)
 where
     G: FnMut(&T, &T) -> bool,
 {
-    assert_eq!(list.len(), 3);
+    assert_eq!(list.len(), 3, "length {} does not equal three.", list.len());
     if g(&list[1], &list[0]) {
         list.swap(1, 0);
     }

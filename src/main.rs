@@ -91,7 +91,7 @@ fn main() -> ! {
     HSV_COLOR.init(HsvColor::default());
     HSV_COLOR.with_lock(|hsv| mb2_display.show(&hsv.to_display()));
 
-    RGB_DISPLAY.init(RgbDisplay::new([pin_r, pin_g, pin_b], timer_pwm, 0.25));
+    RGB_DISPLAY.init(RgbDisplay::new([pin_r, pin_g, pin_b], timer_pwm, 0.2));
     RGB_DISPLAY.with_lock(|display| display.step());
 
     MB2_DISPLAY.init(mb2_display);
@@ -104,7 +104,7 @@ fn main() -> ! {
         board.buttons.button_b.degrade(),
     );
 
-    init_nvic();
+    init_nvic(board.NVIC);
 
     loop {
         if let Ok(v) = saadc.read_channel(&mut pin_pot) {
@@ -133,11 +133,19 @@ fn main() -> ! {
 }
 
 /// Set up the NVIC to handle interrupts.
-fn init_nvic() {
+fn init_nvic(mut nvic: pac::NVIC) {
     unsafe {
+        // buttons
         pac::NVIC::unmask(pac::Interrupt::GPIOTE);
+        nvic.set_priority(pac::Interrupt::GPIOTE, 32);
+
+        // mb2 display
         pac::NVIC::unmask(pac::Interrupt::TIMER2);
+        nvic.set_priority(pac::Interrupt::TIMER2, 32);
+
+        // led display (high priority)
         pac::NVIC::unmask(pac::Interrupt::TIMER3);
+        nvic.set_priority(pac::Interrupt::TIMER3, 16);
     };
     pac::NVIC::unpend(pac::Interrupt::GPIOTE);
     pac::NVIC::unpend(pac::Interrupt::TIMER2);
