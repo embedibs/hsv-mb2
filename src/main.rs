@@ -1,15 +1,6 @@
 //! hsv-mb2
 //! ethan dibble <edibble@pdx.edu>
 
-// RGB light cycle
-// total 10ms = 10_000us
-// turn all rgb on
-// multiply intensities by 10_000
-// set timer in steps to turn off channels
-// example: (0.8, 0.2, 0.5)
-// interrupt at 2_000, 5_000, 8_000 seconds from cycle start
-// steps of 2_000, 3_000, 3_000
-
 #![no_main]
 #![no_std]
 
@@ -122,7 +113,7 @@ fn main() -> ! {
                 RGB_DISPLAY.with_lock(|display| {
                     if !display.is_scheduled() {
                         #[cfg(feature = "log")]
-                        rprintln!(">>>>>>>>>>>>>>>>>>> setting next schedule");
+                        rprintln!("setting next schedule");
 
                         display.set_schedule(hsv_color.to_rgb());
                     }
@@ -135,15 +126,15 @@ fn main() -> ! {
 /// Set up the NVIC to handle interrupts.
 fn init_nvic(mut nvic: pac::NVIC) {
     unsafe {
-        // buttons
+        // buttons (low priority).
         pac::NVIC::unmask(pac::Interrupt::GPIOTE);
         nvic.set_priority(pac::Interrupt::GPIOTE, 32);
 
-        // mb2 display
+        // mb2 display (low priority).
         pac::NVIC::unmask(pac::Interrupt::TIMER2);
         nvic.set_priority(pac::Interrupt::TIMER2, 32);
 
-        // led display (high priority)
+        // led display (high priority).
         pac::NVIC::unmask(pac::Interrupt::TIMER3);
         nvic.set_priority(pac::Interrupt::TIMER3, 16);
     };
@@ -152,6 +143,7 @@ fn init_nvic(mut nvic: pac::NVIC) {
     pac::NVIC::unpend(pac::Interrupt::TIMER3);
 }
 
+/// Set up microbit buttons.
 fn init_buttons(
     timer0: pac::TIMER0,
     timer1: pac::TIMER1,

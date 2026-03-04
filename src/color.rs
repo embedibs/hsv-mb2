@@ -4,7 +4,9 @@ use hsv::{Hsv, Rgb};
 use microbit::display::nonblocking::BitImage;
 
 pub struct HsvColor {
+    /// HSV color.
     pub hsv: Hsv,
+    /// What channel is being manipulated.
     pub state: State,
 }
 
@@ -20,14 +22,17 @@ impl HsvColor {
         }
     }
 
+    /// Convert underlying HSV color to RGB.
     pub fn to_rgb(&self) -> Rgb {
         Rgb::from(self.hsv)
     }
 
+    /// Convert HSV state to an mb2 display.
     pub fn to_display(&self) -> BitImage {
         BitImage::from(self.state)
     }
 
+    /// Set the current HSV color channel value.
     pub fn set_current(&mut self, v: f32) {
         self.with_current(|x| *x = v);
     }
@@ -69,29 +74,26 @@ impl From<State> for BitImage {
     }
 }
 
-#[rustfmt::skip]
 pub const DISPLAY_H: BitImage = BitImage::new(&[
-    [0,1,0,1,0],
-    [0,1,0,1,0],
-    [0,1,1,1,0],
-    [0,1,0,1,0],
-    [0,1,0,1,0],
+    [0, 1, 0, 1, 0],
+    [0, 1, 0, 1, 0],
+    [0, 1, 1, 1, 0],
+    [0, 1, 0, 1, 0],
+    [0, 1, 0, 1, 0],
 ]);
 
-#[rustfmt::skip]
 pub const DISPLAY_S: BitImage = BitImage::new(&[
-    [0,1,1,1,0],
-    [0,1,0,0,0],
-    [0,1,1,1,0],
-    [0,0,0,1,0],
-    [0,1,1,1,0],
+    [0, 1, 1, 1, 0],
+    [0, 1, 0, 0, 0],
+    [0, 1, 1, 1, 0],
+    [0, 0, 0, 1, 0],
+    [0, 1, 1, 1, 0],
 ]);
 
-#[rustfmt::skip]
 pub const DISPLAY_V: BitImage = BitImage::new(&[
-    [0,1,0,1,0],
-    [0,1,0,1,0],
-    [0,1,0,1,0],
-    [0,1,0,1,0],
-    [0,0,1,0,0],
+    [0, 1, 0, 1, 0],
+    [0, 1, 0, 1, 0],
+    [0, 1, 0, 1, 0],
+    [0, 1, 0, 1, 0],
+    [0, 0, 1, 0, 0],
 ]);

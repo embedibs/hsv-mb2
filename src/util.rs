@@ -44,6 +44,7 @@ where
     }
 }
 
+// based on slice::sort_by_key
 /// Sorts exactly three elements by key.
 pub fn sort3_by_key<T, K, F>(list: &mut [T], mut f: F)
 where

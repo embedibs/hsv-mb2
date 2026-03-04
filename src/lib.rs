@@ -1,3 +1,5 @@
+//! hsv-mb2
+
 #![no_main]
 #![no_std]
 

@@ -1,11 +1,10 @@
-use embedded_hal::{delay::DelayNs, digital::OutputPin};
+//! RGB display
+
+use embedded_hal::digital::OutputPin;
 use microbit::hal::{gpio, pac, timer::Timer};
 
 // The RGB PWM brightness scale is 100 steps, with each step taking 100 µs.
 // 10 ms per frame; 100 frames per second.
-
-#[cfg(feature = "log")]
-use rtt_target::rprintln;
 
 const STEP_US: u32 = 100;
 
