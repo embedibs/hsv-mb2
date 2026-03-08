@@ -144,13 +144,15 @@ fn init_nvic(mut nvic: pac::NVIC) {
 }
 
 /// Set up microbit buttons.
-fn init_buttons(
+fn init_buttons<Pin>(
     timer0: pac::TIMER0,
     timer1: pac::TIMER1,
     gpiote: pac::GPIOTE,
-    button_a: impl gpiote::GpioteInputPin,
-    button_b: impl gpiote::GpioteInputPin,
-) {
+    button_a: Pin,
+    button_b: Pin,
+) where
+    Pin: gpiote::GpioteInputPin,
+{
     let mut timer_debounce_a = Timer::new(timer0);
     let mut timer_debounce_b = Timer::new(timer1);
 

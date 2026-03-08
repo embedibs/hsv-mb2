@@ -1,7 +1,5 @@
 # hsv-mb2
 
-https://github.com/user-attachments/assets/d2757e51-06db-42ee-9e17-5beaef508c68
-
 ## Dependencies
 
 ```
@@ -20,6 +18,10 @@ cargo embed --release
 ## Features
 
 - log: enables rtt logging
+
+## Video
+
+https://github.com/user-attachments/assets/d2757e51-06db-42ee-9e17-5beaef508c68
 
 ## License
 

@@ -2,7 +2,7 @@
 
 use critical_section_lock_mut::LockMut;
 
-use microbit::hal::timer::{Instance, Timer};
+use microbit::hal::timer::{self, Timer};
 
 /// 100ms at 1MHz count rate.
 const DEBOUNCE_TIME: u32 = 100 * 1_000_000 / 1000;
@@ -10,7 +10,7 @@ const DEBOUNCE_TIME: u32 = 100 * 1_000_000 / 1000;
 /// Debounce Helper
 pub fn debounce<I, F>(timer: &LockMut<Timer<I>>, f: F)
 where
-    I: Instance,
+    I: timer::Instance,
     F: FnOnce(),
 {
     timer.with_lock(|timer| {
@@ -29,7 +29,7 @@ pub struct Button<I, F> {
 
 impl<I, F> Button<I, F>
 where
-    I: Instance,
+    I: timer::Instance,
     F: Fn(),
 {
     pub fn new(timer: Timer<I>, on_press: F) -> Self {

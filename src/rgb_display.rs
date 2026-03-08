@@ -66,14 +66,13 @@ impl RgbDisplay {
 
         self.tick = 0;
         // Let the interrupt handler call step
-        self.timer3.start(STEP_US);
+        self.timer3.start(1);
     }
 
     /// Take the next frame update step. Called at startup
     /// and then from the timer interrupt handler.
     pub fn step(&mut self) {
-        // The timer event is already reset internally
-        // self.timer3.reset_event();
+        self.timer3.reset_event();
 
         if let Some(&next_tick) = self
             .schedule
@@ -91,17 +90,8 @@ impl RgbDisplay {
 
             let delay = (next_tick - self.tick) * STEP_US;
 
-            // delay_us delay
-            // = { apply delay_us }
-            // delay_ns (delay * 1_000)
-            // = { apply delay_ns }
-            // delay (delay * 1_000 / 1_000)
-            // = { apply delay }
-            // start delay;
-            // spin loop until done
-
             self.tick = next_tick;
-            self.timer3.start(delay.max(STEP_US) /* microseconds */);
+            self.timer3.start(delay.max(1) /* microseconds */);
         } else {
             if let Some(schedule) = self.next_schedule.take() {
                 self.schedule = schedule;
