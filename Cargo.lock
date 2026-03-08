@@ -324,9 +324,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.44"
+version = "1.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21b2ebcf727b7760c461f091f9f0f539b77b8e87f2fd88131e7f1b433b3cece4"
+checksum = "41f2619966050689382d2b44f664f4bc593e129785a36d6ee376ddf37259b924"
 dependencies = [
  "proc-macro2",
 ]
@@ -381,7 +381,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 [[package]]
 name = "state-enum"
 version = "0.1.0"
-source = "git+https://github.com/edibblepdx/state-enum#7f60350ec9840e2c55fe3038fe3e16021fb85a34"
+source = "git+https://github.com/edibblepdx/state-enum#f328075243ca9b4e89f27b6d2ac46f1be854aaad"
 dependencies = [
  "quote",
  "syn",
