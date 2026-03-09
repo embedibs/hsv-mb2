@@ -15,7 +15,7 @@ use microbit::{
     Board,
     display::nonblocking::Display,
     hal::{
-        gpio::Level,
+        gpio::{self, Floating, Input, Level},
         gpiote::{self, Gpiote},
         pac::{self, interrupt},
         saadc::{Saadc, SaadcConfig},
@@ -144,15 +144,13 @@ fn init_nvic(mut nvic: pac::NVIC) {
 }
 
 /// Set up microbit buttons.
-fn init_buttons<Pin>(
+fn init_buttons(
     timer0: pac::TIMER0,
     timer1: pac::TIMER1,
     gpiote: pac::GPIOTE,
-    button_a: Pin,
-    button_b: Pin,
-) where
-    Pin: gpiote::GpioteInputPin,
-{
+    button_a: gpio::Pin<Input<Floating>>,
+    button_b: gpio::Pin<Input<Floating>>,
+) {
     let mut timer_debounce_a = Timer::new(timer0);
     let mut timer_debounce_b = Timer::new(timer1);
 
