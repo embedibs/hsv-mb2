@@ -24,12 +24,12 @@ impl HsvColor {
 
     /// Convert underlying HSV color to RGB.
     pub fn to_rgb(&self) -> Rgb {
-        Rgb::from(self.hsv)
+        self.hsv.into()
     }
 
     /// Convert HSV state to an mb2 display.
-    pub fn to_display(&self) -> BitImage {
-        BitImage::from(self.state)
+    pub fn to_display(&self) -> &BitImage {
+        self.state.into()
     }
 
     /// Set the current HSV color channel value.
@@ -62,7 +62,7 @@ impl Default for HsvColor {
 #[state_enum::state_enum]
 pub enum State { H, S, V }
 
-impl From<State> for BitImage {
+impl From<State> for &BitImage {
     fn from(s: State) -> Self {
         use State::*;
 
@@ -74,7 +74,7 @@ impl From<State> for BitImage {
     }
 }
 
-pub const DISPLAY_H: BitImage = BitImage::new(&[
+static DISPLAY_H: &BitImage = &BitImage::new(&[
     [0, 1, 0, 1, 0],
     [0, 1, 0, 1, 0],
     [0, 1, 1, 1, 0],
@@ -82,7 +82,7 @@ pub const DISPLAY_H: BitImage = BitImage::new(&[
     [0, 1, 0, 1, 0],
 ]);
 
-pub const DISPLAY_S: BitImage = BitImage::new(&[
+static DISPLAY_S: &BitImage = &BitImage::new(&[
     [0, 1, 1, 1, 0],
     [0, 1, 0, 0, 0],
     [0, 1, 1, 1, 0],
@@ -90,7 +90,7 @@ pub const DISPLAY_S: BitImage = BitImage::new(&[
     [0, 1, 1, 1, 0],
 ]);
 
-pub const DISPLAY_V: BitImage = BitImage::new(&[
+static DISPLAY_V: &BitImage = &BitImage::new(&[
     [0, 1, 0, 1, 0],
     [0, 1, 0, 1, 0],
     [0, 1, 0, 1, 0],

@@ -177,7 +177,7 @@ fn init_buttons(
         HSV_COLOR.with_lock(|hsv| {
             hsv.state = hsv.state.pred();
             MB2_DISPLAY.with_lock(|display| {
-                display.show(&hsv.to_display());
+                display.show(hsv.to_display());
             });
         });
     }));
@@ -189,7 +189,7 @@ fn init_buttons(
         HSV_COLOR.with_lock(|hsv| {
             hsv.state = hsv.state.succ();
             MB2_DISPLAY.with_lock(|display| {
-                display.show(&hsv.to_display());
+                display.show(hsv.to_display());
             });
         });
     }));
